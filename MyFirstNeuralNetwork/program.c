@@ -7,6 +7,7 @@ double Derivative(double x)
     return Effective(x) * (1 - Effective(x));
 }
 
+
 __kernel void GetGradient(__constant int* InputSize, __constant int* HidenSize, __constant int* OutputSize,
 	__constant double* HidenBase1D, __constant double* OutputBase,
 	__constant double* HidenWeight1D, __constant double* OutputWeight1D,

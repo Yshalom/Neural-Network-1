@@ -165,19 +165,16 @@ namespace MyFirstNeuralNetwork
         ~NeuralNetwork()
         {
             //Release Kernel its objects
-            if (IsKernelRight)
-            {
-                CL.ReleaseKernel(kernel);
-                CL.ReleaseProgram(program);
-                CL.ReleaseCommandQueue(queue);
-                CL.ReleaseContext(context);
-                CL.ReleaseDevice(devices[0]);
+            CL.ReleaseKernel(kernel);
+            CL.ReleaseProgram(program);
+            CL.ReleaseCommandQueue(queue);
+            CL.ReleaseContext(context);
+            CL.ReleaseDevice(devices[0]);
 
-                CL.ReleaseMemoryObject(BInputSize);
-                CL.ReleaseMemoryObject(BHidenSize);
-                CL.ReleaseMemoryObject(BOutputSize);
-                CL.ReleaseMemoryObject(BHidenSizeLength);
-            }
+            CL.ReleaseMemoryObject(BInputSize);
+            CL.ReleaseMemoryObject(BHidenSize);
+            CL.ReleaseMemoryObject(BOutputSize);
+            CL.ReleaseMemoryObject(BHidenSizeLength);
         }
 
         public void Save(string Path)
@@ -280,7 +277,13 @@ namespace MyFirstNeuralNetwork
         private double[] GetData(string Path)
         {
             if (!dictionary.ContainsKey(Path))
-                dictionary.Add(Path, GetData(new Bitmap(Path)));
+            {
+                lock (dictionary)
+                {
+                    if (!dictionary.ContainsKey(Path))
+                        dictionary.Add(Path, GetData(new Bitmap(Path)));
+                }
+            }
             return dictionary[Path];
         }
         private double[] GetData(Bitmap input)
@@ -300,14 +303,16 @@ namespace MyFirstNeuralNetwork
             return list.ToArray();
         }
 
-        private struct Gradient {
+        private struct Gradient
+        {
             public double[][] GHidenBase;
             public double[] GOutputBase;
-            
+
             public double[][][] GHidenWeight;
             public double[][] GOutputWeight;
         }
 
+        //CPU
         private Gradient GetGradient(double[] Data, double[] Result)
         {
             //Use
@@ -563,100 +568,28 @@ namespace MyFirstNeuralNetwork
             MessageBox.Show(log, "שגיאה: " + type);
         }
 
-        private static CLPlatform[] platforms;
-        private static CLDevice[] devices;
-        private static CLContext context;
-        private static CLCommandQueue queue;
-        private static CLProgram program;
-        private static CLKernel kernel;
-        private static bool IsKernelRight = false;
-        private static CLBuffer BInputSize;
-        private static CLBuffer BHidenSize;
-        private static CLBuffer BOutputSize;
-        private static CLBuffer BHidenSizeLength;
-        private Gradient GetGradient(double[][] data, double[][] result)
+        //GPU
+        private Gradient GetGradient(double[] data, int Examples, double[] result)
         {
             // Create the Platform to GPU
             CLResultCode res;
             CLEvent clevent;
 
-            if (!IsKernelRight)
-            {
-                res = CL.GetPlatformIds(out platforms);
-                if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
-                
-                res = CL.GetDeviceIds(platforms[0], DeviceType.Gpu, out devices);
-                if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
+            // Create memory - push data.
 
-                ///////////////////////////////////
-                int DeviceIndex = 0;
-                for (int i = 0; i < devices.Length; i++)
-                {
-                    byte[] DeviceNameByte;
-                    CL.GetDeviceInfo(devices[i], DeviceInfo.Name, out DeviceNameByte);
-                    char[] DeviceNameChar = new char[DeviceNameByte.Length];
-                    DeviceNameByte.CopyTo(DeviceNameChar, 0);
-                    string DeviceNameString = new string(DeviceNameChar);
 
-                    if (MessageBox.Show(DeviceNameString + "\n\nIf nothing will be chosen, the system will choose the first GPU!", (i + 1).ToString() + "/" + devices.Length.ToString(), MessageBoxButtons.YesNo) == DialogResult.Yes)
-                    {
-                        DeviceIndex = i;
-                        break;
-                    }
-                }
+            CLBuffer BData = CL.CreateBuffer(context, MemoryFlags.ReadOnly, (UIntPtr)(sizeof(double) * data.Length), IntPtr.Zero, out res);
+            if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
+            res = CL.EnqueueWriteBuffer(queue, BData, true, UIntPtr.Zero, data.ToArray(), null, out clevent);
+            if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
 
-                context = CL.CreateContext(IntPtr.Zero, 1, devices, IntPtr.Zero, IntPtr.Zero, out res);
-                if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
+            CLBuffer BResult = CL.CreateBuffer(context, MemoryFlags.ReadOnly, (UIntPtr)(sizeof(double) * result.Length), IntPtr.Zero, out res);
+            if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
+            res = CL.EnqueueWriteBuffer(queue, BResult, true, UIntPtr.Zero, result.ToArray(), null, out clevent);
+            if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
 
-                queue = CL.CreateCommandQueueWithProperties(context, devices[0], IntPtr.Zero, out res);
-                if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
 
-                string programSource = File.OpenText("..//..//..//program.c").ReadToEnd();
-                program = CL.CreateProgramWithSource(context, programSource, out res);
-                if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
-
-                res = CL.BuildProgram(program, 1, devices, "", IntPtr.Zero, IntPtr.Zero);
-                if (res != CLResultCode.Success)
-                {
-                    byte[] log;
-                    CLResultCode res2 = CL.GetProgramBuildInfo(program, devices[0], ProgramBuildInfo.Log, out log);
-                    if (res2 != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); };
-                    char[] logchar = new char[log.Length];
-                    for (int i = 0; i < log.Length; i++)
-                        logchar[i] = (char)log[i];
-
-                    ViewError(new string(logchar), res.ToString());
-                }
-
-                kernel = CL.CreateKernel(program, "GetGradient", out res);
-                if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
-
-                IsKernelRight = true;
-
-                // Create the Memory
-
-                BInputSize = CL.CreateBuffer(context, MemoryFlags.ReadOnly, (UIntPtr)sizeof(int), IntPtr.Zero, out res);
-                if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
-                res = CL.EnqueueWriteBuffer(queue, BInputSize, true, UIntPtr.Zero, new int[] { InputSize }, null, out clevent);
-                if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
-
-                BHidenSize = CL.CreateBuffer(context, MemoryFlags.ReadOnly, (UIntPtr)(sizeof(int) * HidenSize.Length), IntPtr.Zero, out res);
-                if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
-                res = CL.EnqueueWriteBuffer(queue, BHidenSize, true, UIntPtr.Zero, HidenSize, null, out clevent);
-                if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
-
-                BOutputSize = CL.CreateBuffer(context, MemoryFlags.ReadOnly, (UIntPtr)sizeof(int), IntPtr.Zero, out res);
-                if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
-                res = CL.EnqueueWriteBuffer(queue, BOutputSize, true, UIntPtr.Zero, new int[] { OutputSize }, null, out clevent);
-                if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
-
-                BHidenSizeLength = CL.CreateBuffer(context, MemoryFlags.ReadOnly, (UIntPtr)sizeof(int), IntPtr.Zero, out res);
-                if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
-                res = CL.EnqueueWriteBuffer(queue, BHidenSizeLength, true, UIntPtr.Zero, new int[] { HidenSize.Length }, null, out clevent);
-                if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
-            }
-
-            // Create the Memory - push network.
+            // Create memory - push network.
             List<double> HidenBase1D = new List<double>();
             for (int i = 0; i < HidenBase.Length; i++)
                 HidenBase1D.AddRange(HidenBase[i]);
@@ -687,39 +620,25 @@ namespace MyFirstNeuralNetwork
             res = CL.EnqueueWriteBuffer(queue, BOutputWeight, true, UIntPtr.Zero, OutputWeight1D.ToArray(), null, out clevent);
             if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
 
-            // Create the Memory - push data.
-            List<double> Data1D = new List<double>(data.Length);
-            for (int i = 0; i < data.Length; i++)
-                Data1D.AddRange(data[i]);
-            CLBuffer BData = CL.CreateBuffer(context, MemoryFlags.ReadOnly, (UIntPtr)(sizeof(double) * Data1D.Count), IntPtr.Zero, out res);
-            if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
-            res = CL.EnqueueWriteBuffer(queue, BData, true, UIntPtr.Zero, Data1D.ToArray(), null, out clevent);
+            // Create memmory - output
+
+            CLBuffer BGHidenBase = CL.CreateBuffer(context, MemoryFlags.ReadWrite, (UIntPtr)(sizeof(double) * HidenBase1D.Count * Examples), IntPtr.Zero, out res);
             if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
 
-            List<double> Result1D = new List<double>();
-            for (int i = 0; i < result.Length; i++)
-                    Result1D.AddRange(result[i]);
-            CLBuffer BResult = CL.CreateBuffer(context, MemoryFlags.ReadOnly, (UIntPtr)(sizeof(double) * Result1D.Count), IntPtr.Zero, out res);
-            if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
-            res = CL.EnqueueWriteBuffer(queue, BResult, true, UIntPtr.Zero, Result1D.ToArray(), null, out clevent);
+            CLBuffer BGOutputBase = CL.CreateBuffer(context, MemoryFlags.ReadWrite, (UIntPtr)(sizeof(double) * OutputBase.Length * Examples), IntPtr.Zero, out res);
             if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
 
-            CLBuffer BGHidenBase = CL.CreateBuffer(context, MemoryFlags.ReadWrite, (UIntPtr)(sizeof(double) * HidenBase1D.Count * data.Length), IntPtr.Zero, out res);
+
+            CLBuffer BGHidenWeight = CL.CreateBuffer(context, MemoryFlags.ReadWrite, (UIntPtr)(sizeof(double) * HidenWeight1D.Count * Examples), IntPtr.Zero, out res);
             if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
 
-            CLBuffer BGOutputBase = CL.CreateBuffer(context, MemoryFlags.ReadWrite, (UIntPtr)(sizeof(double) * OutputBase.Length * data.Length), IntPtr.Zero, out res);
+            CLBuffer BGOutputWeight = CL.CreateBuffer(context, MemoryFlags.ReadWrite, (UIntPtr)(sizeof(double) * OutputWeight1D.Count * Examples), IntPtr.Zero, out res);
             if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
 
-            CLBuffer BGHidenWeight = CL.CreateBuffer(context, MemoryFlags.ReadWrite, (UIntPtr)(sizeof(double) * HidenWeight1D.Count * data.Length), IntPtr.Zero, out res);
+            CLBuffer BhidenAll = CL.CreateBuffer(context, MemoryFlags.ReadWrite, (UIntPtr)(sizeof(double) * HidenBase1D.Count * Examples), IntPtr.Zero, out res);
             if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
 
-            CLBuffer BGOutputWeight = CL.CreateBuffer(context, MemoryFlags.ReadWrite, (UIntPtr)(sizeof(double) * OutputWeight1D.Count * data.Length), IntPtr.Zero, out res);
-            if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
-
-            CLBuffer BhidenAll = CL.CreateBuffer(context, MemoryFlags.ReadWrite, (UIntPtr)(sizeof(double) * HidenBase1D.Count * data.Length), IntPtr.Zero, out res);
-            if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
-
-            CLBuffer BoutputAll = CL.CreateBuffer(context, MemoryFlags.ReadWrite, (UIntPtr)(sizeof(double) * OutputBase.Length * data.Length), IntPtr.Zero, out res);
+            CLBuffer BoutputAll = CL.CreateBuffer(context, MemoryFlags.ReadWrite, (UIntPtr)(sizeof(double) * OutputBase.Length * Examples), IntPtr.Zero, out res);
             if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
 
             CLBuffer BGHidenWeight1DLength = CL.CreateBuffer(context, MemoryFlags.ReadOnly, (UIntPtr)sizeof(int), IntPtr.Zero, out res);
@@ -728,7 +647,6 @@ namespace MyFirstNeuralNetwork
             if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
 
             //Set the memory
-
             res = CL.SetKernelArg(kernel, 0, BInputSize);
             if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
             res = CL.SetKernelArg(kernel, 1, BHidenSize);
@@ -766,44 +684,37 @@ namespace MyFirstNeuralNetwork
 
             //Execute the program
 
-            UIntPtr[] globalWorkSize = new UIntPtr[] { (UIntPtr) data.Length };
+            UIntPtr[] globalWorkSize = new UIntPtr[] { (UIntPtr)Examples };
             UIntPtr[] localWorkSize = new UIntPtr[] { (UIntPtr)1 };
             res = CL.EnqueueNDRangeKernel(queue, kernel, 1, new UIntPtr[1] { UIntPtr.Zero }, globalWorkSize, localWorkSize, 0, null, out clevent);
             if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
 
             //Get the memory
 
-            double[] GHidenBase1D = new double[HidenBase1D.Count * data.Length];
-            double[] GOutputBase1D = new double[OutputBase.Length * data.Length];
-            double[] GHidenWeight1D = new double[HidenWeight1D.Count * data.Length];
-            double[] GOutputWeight1D = new double[OutputWeight1D.Count * data.Length];
-            //-----------------------------------------------------------------------
-            //debuging
-            //double[] hiden1D = new double[HidenBase1D.Count * data.Length];
-            //double[] output1D = new double[OutputBase.Length * data.Length];
-            //for (int i = 0; i < data.Length; i++)
-            //    programDebug(new int[] { InputSize }, HidenSize, new int[] { OutputSize }, HidenBase1D.ToArray(), OutputBase, HidenWeight1D.ToArray(), OutputWeight1D.ToArray(), Data1D.ToArray(), Result1D.ToArray(), new int[] { HidenSize.Length }, ref GHidenBase1D, ref GOutputBase1D, ref GHidenWeight1D, ref GOutputWeight1D, ref hiden1D, ref output1D, new int[] { HidenWeight1D.Count }, i);
-            //-----------------------------------------------------------------------
-            
+            double[] GHidenBase1D = new double[HidenBase1D.Count * Examples];
+            double[] GOutputBase1D = new double[OutputBase.Length * Examples];
+            double[] GHidenWeight1D = new double[HidenWeight1D.Count * Examples];
+            double[] GOutputWeight1D = new double[OutputWeight1D.Count * Examples];
+
             res = CL.EnqueueReadBuffer(queue, BGHidenBase, true, UIntPtr.Zero, GHidenBase1D, null, out clevent);
             if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
-            
+
             res = CL.EnqueueReadBuffer(queue, BGOutputBase, true, UIntPtr.Zero, GOutputBase1D, null, out clevent);
             if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
-            
+
             res = CL.EnqueueReadBuffer(queue, BGHidenWeight, true, UIntPtr.Zero, GHidenWeight1D, null, out clevent);
             if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
-            
+
             res = CL.EnqueueReadBuffer(queue, BGOutputWeight, true, UIntPtr.Zero, GOutputWeight1D, null, out clevent);
             if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
-            
+
             //Close program
-            
+
             res = CL.Finish(queue);
             if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
-            
+
             //Release the momory
-            
+
             CL.ReleaseMemoryObject(BData);
             CL.ReleaseMemoryObject(BResult);
             CL.ReleaseMemoryObject(BGHidenBase);
@@ -856,7 +767,7 @@ namespace MyFirstNeuralNetwork
             }
 
             //Sum all the gradients.
-            for (int i = 0; i < data.Length; i++)
+            for (int i = 0; i < Examples; i++)
             {
                 for (int j = 0; j < HidenSize.Length; j++)
                 {
@@ -888,29 +799,46 @@ namespace MyFirstNeuralNetwork
                 for (int j = 0; j < HidenSize.Length; j++)
                 {
                     for (int k = 0; k < HidenSize[j]; k++)
-                        gradient.GHidenBase[j][k] /= data.Length;
+                        gradient.GHidenBase[j][k] /= Examples;
                 }
 
                 for (int j = 0; j < OutputSize; j++)
-                    gradient.GOutputBase[j] /= data.Length;
+                    gradient.GOutputBase[j] /= Examples;
 
                 for (int j = 0; j < HidenWeight.Length; j++)
                 {
                     for (int k = 0; k < HidenWeight[j].Length; k++)
                     {
                         for (int l = 0; l < HidenWeight[j][k].Length; l++)
-                            gradient.GHidenWeight[j][k][l] /= data.Length;
+                            gradient.GHidenWeight[j][k][l] /= Examples;
                     }
                 }
 
                 for (int j = 0; j < OutputSize; j++)
                 {
                     for (int k = 0; k < OutputWeight[j].Length; k++)
-                        gradient.GOutputWeight[j][k] /= data.Length;
+                        gradient.GOutputWeight[j][k] /= Examples;
                 }
             }
 
             return gradient;
+        }
+
+        int[] LOCK_GRADIENT = new int[0];
+        private Gradient GetGradient(double[][] data, double[][] result)
+        {
+            List<double> Data1D = new List<double>(data.Length);
+            for (int i = 0; i < data.Length; i++)
+                Data1D.AddRange(data[i]);
+
+            List<double> Result1D = new List<double>();
+            for (int i = 0; i < result.Length; i++)
+                Result1D.AddRange(result[i]);
+
+            lock (LOCK_GRADIENT)
+            {
+                return GetGradient(Data1D.ToArray(), data.Length, Result1D.ToArray());
+            }
         }
 
         public void TrainingCPU(string[] data, double[][] result)
@@ -923,9 +851,10 @@ namespace MyFirstNeuralNetwork
                 data2[i] = GetData(data[i]);
 
             Gradient[] Gradients = new Gradient[data.Length];
+
             Parallel.For(0, data.Length, i =>
             {
-                    Gradients[i] = GetGradient(data2[i], result[i]);
+                Gradients[i] = GetGradient(data2[i], result[i]);
             });
 
             Gradient g = new Gradient();
@@ -972,8 +901,7 @@ namespace MyFirstNeuralNetwork
                     OutputWeight[j][k] -= g.GOutputWeight[j][k] / Gradients.Length;
         }
 
-        static int Div = 1;
-        public void TrainingGPU(string[] data, double[][] result)
+        public void TrainingGPU(string[] data, double[][] result, int Div = 1)
         {
             if (data.Length != result.Length && data.Length >= 1)
                 return;
@@ -988,8 +916,8 @@ namespace MyFirstNeuralNetwork
             {
                 for (int i = 0; i < Div - 1; i++)
                 {
-                    dataN[i] = data2.ToList().GetRange(data.Length / 8 * i, data.Length / 8).ToArray();
-                    resultN[i] = result.ToList().GetRange(result.Length / 8 * i, result.Length / 8).ToArray();
+                    dataN[i] = data2.ToList().GetRange(data.Length / Div * i, data.Length / Div).ToArray();
+                    resultN[i] = result.ToList().GetRange(result.Length / Div * i, result.Length / Div).ToArray();
                 }
                 dataN[Div - 1] = data2.ToList().GetRange(data.Length / Div * (Div - 1), data.Length - data.Length / Div * (Div - 1)).ToArray();
                 resultN[Div - 1] = result.ToList().GetRange(result.Length / Div * (Div - 1), result.Length - result.Length / Div * (Div - 1)).ToArray();
@@ -1002,22 +930,26 @@ namespace MyFirstNeuralNetwork
 
             Gradient[] Gradients = new Gradient[Div];
 
-            try
+           // try
             {
-                Parallel.For(0, Div, i =>
+                if (Div > 1)
                 {
-                    Gradients[i] = GetGradient(dataN[i], resultN[i]);
-                });
-            }
-            catch (Exception ex)
-            {
-                if (MessageBox.Show("?שגיאה של גלישה, האם תרצה להריץ שוב", "שגיאה", MessageBoxButtons.YesNoCancel) == DialogResult.Yes)
-                {
-                    Div *= 2;
-                    TrainingGPU(data, result);
+                    Parallel.For(0, Div, i =>
+                    {
+                        Gradients[i] = GetGradient(dataN[i], resultN[i]);
+                    });
                 }
-                return;
+                else
+                    Gradients[0] = GetGradient(dataN[0], resultN[0]);
+
             }
+            //catch (Exception ex)
+            //{
+            //    if (MessageBox.Show("?שגיאה של גלישה, האם תרצה להריץ שוב", "שגיאה", MessageBoxButtons.YesNoCancel) == DialogResult.Yes)
+            //        TrainingGPU(data, result, Div + 1);
+            //    return;
+            //}
+
 
             Gradient g = new Gradient();
             g.GHidenBase = Gradients[0].GHidenBase;
@@ -1027,47 +959,146 @@ namespace MyFirstNeuralNetwork
 
             //avarage the gradient
             for (int i = 1; i < Gradients.Length; i++)
+                {
+                    for (int j = 0; j < g.GHidenBase.Length; j++)
+                        for (int k = 0; k < g.GHidenBase[j].Length; k++)
+                            g.GHidenBase[j][k] += Gradients[i].GHidenBase[j][k];
+
+                    for (int j = 0; j < g.GHidenWeight.Length; j++)
+                        for (int k = 0; k < g.GHidenWeight[j].Length; k++)
+                            for (int l = 0; l < g.GHidenWeight[j][k].Length; l++)
+                                g.GHidenWeight[j][k][l] = Gradients[i].GHidenWeight[j][k][l];
+
+                    for (int j = 0; j < g.GOutputBase.Length; j++)
+                        g.GOutputBase[j] = Gradients[i].GOutputBase[j];
+
+                    for (int j = 0; j < g.GOutputWeight.Length; j++)
+                        for (int k = 0; k < g.GOutputWeight[j].Length; k++)
+                            g.GOutputWeight[j][k] += Gradients[i].GOutputWeight[j][k];
+                }
+
+            lock (HidenBase)
             {
+                //change the neural network
                 for (int j = 0; j < g.GHidenBase.Length; j++)
                     for (int k = 0; k < g.GHidenBase[j].Length; k++)
-                        g.GHidenBase[j][k] += Gradients[i].GHidenBase[j][k];
+                        HidenBase[j][k] -= g.GHidenBase[j][k] / Gradients.Length;
 
                 for (int j = 0; j < g.GHidenWeight.Length; j++)
                     for (int k = 0; k < g.GHidenWeight[j].Length; k++)
                         for (int l = 0; l < g.GHidenWeight[j][k].Length; l++)
-                            g.GHidenWeight[j][k][l] = Gradients[i].GHidenWeight[j][k][l];
+                            HidenWeight[j][k][l] -= g.GHidenWeight[j][k][l] / Gradients.Length;
 
                 for (int j = 0; j < g.GOutputBase.Length; j++)
-                    g.GOutputBase[j] = Gradients[i].GOutputBase[j];
+                    OutputBase[j] -= g.GOutputBase[j] / Gradients.Length;
 
                 for (int j = 0; j < g.GOutputWeight.Length; j++)
                     for (int k = 0; k < g.GOutputWeight[j].Length; k++)
-                        g.GOutputWeight[j][k] += Gradients[i].GOutputWeight[j][k];
+                        OutputWeight[j][k] -= g.GOutputWeight[j][k] / Gradients.Length;
+            }
+        }
+
+        private static CLPlatform[] platforms;
+        private static CLDevice[] devices;
+        private static CLContext context;
+        private static CLCommandQueue queue;
+        private static CLProgram program;
+        private static CLKernel kernel;
+        private static CLBuffer BInputSize;
+        private static CLBuffer BHidenSize;
+        private static CLBuffer BOutputSize;
+        private static CLBuffer BHidenSizeLength;
+        private static bool IsKernelRight = false;
+        public bool SetUpKernel()
+        {
+            if (IsKernelRight)
+                return true;
+
+            CLResultCode res;
+            CLEvent clevent;
+
+            res = CL.GetPlatformIds(out platforms);
+            if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
+
+            res = CL.GetDeviceIds(platforms[0], DeviceType.Gpu, out devices);
+            if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
+
+            ///////////////////////////////////
+            int DeviceIndex = 0;
+            for (int i = 0; i < devices.Length; i++)
+            {
+                byte[] DeviceNameByte;
+                CL.GetDeviceInfo(devices[i], DeviceInfo.Name, out DeviceNameByte);
+                char[] DeviceNameChar = new char[DeviceNameByte.Length];
+                DeviceNameByte.CopyTo(DeviceNameChar, 0);
+                string DeviceNameString = new string(DeviceNameChar);
+
+                if (MessageBox.Show(DeviceNameString + "\n\nIf nothing will be chosen, the system will choose the first GPU!", (i + 1).ToString() + "/" + devices.Length.ToString(), MessageBoxButtons.YesNo) == DialogResult.Yes)
+                {
+                    DeviceIndex = i;
+                    break;
+                }
             }
 
-            //change the neural network
-            for (int j = 0; j < g.GHidenBase.Length; j++)
-                for (int k = 0; k < g.GHidenBase[j].Length; k++)
-                    HidenBase[j][k] -= g.GHidenBase[j][k] / Gradients.Length;
+            context = CL.CreateContext(IntPtr.Zero, 1, devices, IntPtr.Zero, IntPtr.Zero, out res);
+            if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
 
-            for (int j = 0; j < g.GHidenWeight.Length; j++)
-                for (int k = 0; k < g.GHidenWeight[j].Length; k++)
-                    for (int l = 0; l < g.GHidenWeight[j][k].Length; l++)
-                        HidenWeight[j][k][l] -= g.GHidenWeight[j][k][l] / Gradients.Length;
+            queue = CL.CreateCommandQueueWithProperties(context, devices[0], IntPtr.Zero, out res);
+            if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
 
-            for (int j = 0; j < g.GOutputBase.Length; j++)
-                OutputBase[j] -= g.GOutputBase[j] / Gradients.Length;
+            string programSource = File.OpenText("..//..//..//program.c").ReadToEnd();
+            program = CL.CreateProgramWithSource(context, programSource, out res);
+            if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
 
-            for (int j = 0; j < g.GOutputWeight.Length; j++)
-                for (int k = 0; k < g.GOutputWeight[j].Length; k++)
-                    OutputWeight[j][k] -= g.GOutputWeight[j][k] / Gradients.Length;
-    }
+            res = CL.BuildProgram(program, 1, devices, "", IntPtr.Zero, IntPtr.Zero);
+            if (res != CLResultCode.Success)
+            {
+                byte[] log;
+                CLResultCode res2 = CL.GetProgramBuildInfo(program, devices[0], ProgramBuildInfo.Log, out log);
+                if (res2 != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); };
+                char[] logchar = new char[log.Length];
+                for (int i = 0; i < log.Length; i++)
+                    logchar[i] = (char)log[i];
 
-    /// <summary>
-    ///This function may cause the neural network to be Imbalance, use it carefully.
-    ///Remember to run this function very few times.
-    /// </summary>
-    public int TrainingOnMistake(string[] data, double[][] result, Action<string[], double[][]> function)
+                ViewError(new string(logchar), res.ToString());
+            }
+
+            kernel = CL.CreateKernel(program, "GetGradient", out res);
+            if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
+
+
+            // Create the Memory
+
+            BInputSize = CL.CreateBuffer(context, MemoryFlags.ReadOnly, (UIntPtr)sizeof(int), IntPtr.Zero, out res);
+            if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
+            res = CL.EnqueueWriteBuffer(queue, BInputSize, true, UIntPtr.Zero, new int[] { InputSize }, null, out clevent);
+            if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
+
+            BHidenSize = CL.CreateBuffer(context, MemoryFlags.ReadOnly, (UIntPtr)(sizeof(int) * HidenSize.Length), IntPtr.Zero, out res);
+            if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
+            res = CL.EnqueueWriteBuffer(queue, BHidenSize, true, UIntPtr.Zero, HidenSize, null, out clevent);
+            if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
+
+            BOutputSize = CL.CreateBuffer(context, MemoryFlags.ReadOnly, (UIntPtr)sizeof(int), IntPtr.Zero, out res);
+            if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
+            res = CL.EnqueueWriteBuffer(queue, BOutputSize, true, UIntPtr.Zero, new int[] { OutputSize }, null, out clevent);
+            if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
+
+            BHidenSizeLength = CL.CreateBuffer(context, MemoryFlags.ReadOnly, (UIntPtr)sizeof(int), IntPtr.Zero, out res);
+            if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
+            res = CL.EnqueueWriteBuffer(queue, BHidenSizeLength, true, UIntPtr.Zero, new int[] { HidenSize.Length }, null, out clevent);
+            if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
+
+
+            IsKernelRight = true;
+            return true;
+        }
+
+        /// <summary>
+        ///This function may cause the neural network to be Imbalance, use it carefully.
+        ///Remember to run this function very few times.
+        /// </summary>
+        public int TrainingOnMistake(string[] data, double[][] result, Action<string[], double[][]> function)
         {
             if (data.Length != result.Length)
                 return -1;
@@ -1105,3 +1136,4 @@ namespace MyFirstNeuralNetwork
         }
     }
 }
+

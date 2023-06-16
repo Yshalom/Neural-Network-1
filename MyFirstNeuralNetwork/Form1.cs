@@ -226,6 +226,8 @@ namespace MyFirstNeuralNetwork
             if (MessageBox.Show("?אתה בטוח שברצונך לבצע אימון נוסף", "הודעה", MessageBoxButtons.YesNo) != DialogResult.Yes)
                 return;
 
+            n.SetUpKernel();
+
             Train(50, 250, 500);
             //MessageBox.Show("End - 50,250,500");
             Train(50, 500, 500);
@@ -234,6 +236,9 @@ namespace MyFirstNeuralNetwork
             //MessageBox.Show("End - 50,1000,500");
             Train(50, 2500, 500);
             //MessageBox.Show("End - 50,2500,500");
+            Train(50, 5000, 500);
+            //MessageBox.Show("End - 50,5000,500");
+            MessageBox.Show("End Train");
 
 
             n.Save("..//..//..//Neural Network.bin");
@@ -245,27 +250,34 @@ namespace MyFirstNeuralNetwork
 
             //Random random = new Random(DateTime.Now.Millisecond + DateTime.Now.Second * 1000 + DateTime.Now.Month * 60000 + DateTime.Now.Hour * 3600000);
             Random random = new Random();
-            for (int iteration = 0; iteration < Times; iteration++)
+
+            System.Threading.Tasks.Parallel.For(0, InOrder, iteration =>
             {
                 List<int[]> l = new List<int[]>();
                 for (int i = 0; i < 10; i++)
                     for (int j = 1; j <= DataSize; j++)
                         l.Add(new int[] { i, j });
 
-                for (int i = 0; i < InOrder; i++)
+                System.Threading.Tasks.Parallel.For(0, InOrder, i =>
                 {
                     List<string> input = new List<string>();
                     List<double[]> result = new List<double[]>();
-                    for (int j = 0; j < Parallel; j++)
-                    {
-                        int n = random.Next(0, l.Count);
-                        input.Add("..//..//..//picture_of_" + l[n][0].ToString() + "//" + l[n][1].ToString() + ".png");
-                        result.Add(new double[10] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 });
-                        result[^1][l[n][0]] = 1;
+                    lock (l) { lock (input) { lock (result)
+                            {
+                                for (int j = 0; j < Parallel; j++)
+                                {
+                                    int n = random.Next(0, l.Count);
 
-                        l[n] = l[^1];
-                        l.RemoveAt(l.Count - 1);
-                    }
+                                    input.Add("..//..//..//picture_of_" + l[n][0].ToString() + "//" + l[n][1].ToString() + ".png");
+                                    result.Add(new double[10] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 });
+                                    result[^1][l[n][0]] = 1;
+
+
+                                    l[n] = l[^1];
+                                    l.RemoveAt(l.Count - 1);
+
+                                }
+                            } } }
 
                     //if (random.Next(0, 100) == 0)
                     //{
@@ -280,8 +292,8 @@ namespace MyFirstNeuralNetwork
                     //}
                     //else
                     n.TrainingGPU(input.ToArray(), result.ToArray());
-                }
-            }
+                });
+            });
         }
 
         private void button1_Click(object sender, EventArgs e)

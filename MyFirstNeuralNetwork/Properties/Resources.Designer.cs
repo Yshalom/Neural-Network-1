@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace Neural_Network_-_1.Properties {
+namespace Neural_Network_1.Properties {
     using System;
     
     
