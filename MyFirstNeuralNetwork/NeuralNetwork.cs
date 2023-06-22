@@ -577,10 +577,9 @@ namespace MyFirstNeuralNetwork
 
             // Create memory - push data.
 
-
-            CLBuffer BData = CL.CreateBuffer(context, MemoryFlags.ReadOnly, (UIntPtr)(sizeof(double) * data.Length), IntPtr.Zero, out res);
+            CLBuffer BData = CL.CreateBuffer(context, MemoryFlags.ReadOnly, (UIntPtr)(sizeof(double) * InputSize * Examples), IntPtr.Zero, out res);
             if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
-            res = CL.EnqueueWriteBuffer(queue, BData, true, UIntPtr.Zero, data.ToArray(), null, out clevent);
+            res = CL.EnqueueWriteBuffer(queue, BData, true, UIntPtr.Zero, data, null, out clevent);
             if (res != CLResultCode.Success) { ViewError(res.ToString(), res.ToString()); throw new Exception("Error"); }
 
             CLBuffer BResult = CL.CreateBuffer(context, MemoryFlags.ReadOnly, (UIntPtr)(sizeof(double) * result.Length), IntPtr.Zero, out res);
@@ -590,6 +589,7 @@ namespace MyFirstNeuralNetwork
 
 
             // Create memory - push network.
+
             List<double> HidenBase1D = new List<double>();
             for (int i = 0; i < HidenBase.Length; i++)
                 HidenBase1D.AddRange(HidenBase[i]);
@@ -1098,7 +1098,7 @@ namespace MyFirstNeuralNetwork
         ///This function may cause the neural network to be Imbalance, use it carefully.
         ///Remember to run this function very few times.
         /// </summary>
-        public int TrainingOnMistake(string[] data, double[][] result, Action<string[], double[][]> function)
+        public int TrainingOnMistakes(string[] data, double[][] result, Action<string[], double[][]> Function_Of_Trianing)
         {
             if (data.Length != result.Length)
                 return -1;
@@ -1130,9 +1130,22 @@ namespace MyFirstNeuralNetwork
                 }
             }
 
-            function(NewData.ToArray(), NewResult.ToArray());
+            Function_Of_Trianing(NewData.ToArray(), NewResult.ToArray());
 
             return NewData.Count;
+        }
+
+        public int CountMistakes(string[] data, double[][] result, Func<double[], double[], bool> ItItWrong)
+        {
+            int count = 0;
+
+            Parallel.For(0, data.Length, i =>
+            {
+                if (ItItWrong(Use(data[i]), result[i]))
+                    count++;
+            });
+
+            return count;
         }
     }
 }

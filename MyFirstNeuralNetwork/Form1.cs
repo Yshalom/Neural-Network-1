@@ -18,8 +18,6 @@ namespace MyFirstNeuralNetwork
     {
         const string path = "..//..//..//picture_of_X";
 
-        //In my Neural Network: input=900 hiden={20, 15} output=10
-
         Graphics g1, g2, g3, g4;
         Bitmap img;
         int x = -1, y = -1;
@@ -42,8 +40,6 @@ namespace MyFirstNeuralNetwork
             pen = new Pen(Color.Black, 20);
             pen.StartCap = pen.EndCap = System.Drawing.Drawing2D.LineCap.Round;
             n = new NeuralNetwork("..//..//..//Neural Network.bin");
-            //n = new NeuralNetwork(900, new int[] { 20, 15 }, 10);
-            //n.Save("..//..//..//Neural Network.bin");
             g3 = pictureBox2.CreateGraphics();
             g4 = panel2.CreateGraphics();
         }
@@ -216,6 +212,42 @@ namespace MyFirstNeuralNetwork
         {
             g1.Clear(Color.White);
             g2.Clear(Color.White);
+        }
+
+        private void button3_Click(object sender, EventArgs e)
+        {
+            if (MessageBox.Show("?אתה בטוח שברצונך למחוק את הרשת, ליצור אחת חדשה", "הודעה", MessageBoxButtons.YesNo) != DialogResult.Yes)
+                return;
+            n = new NeuralNetwork(900, new int[] { 20, 20 }, 10);
+            n.Save("..//..//..//Neural Network.bin");
+            n.SetUpKernel();
+        }
+
+        private void button4_Click(object sender, EventArgs e)
+        {
+            LinkedList<string> input = new LinkedList<string>();
+            LinkedList<double[]> result = new LinkedList<double[]>();
+
+            for (int i = 0; i < 10; i++)
+                for (int j = 1; j <= 500; j++)
+                {
+                    input.AddLast("..//..//..//picture_of_" + i.ToString() + "//" + j.ToString() + ".png");
+                    result.AddLast(new double[10] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 });
+                    result.Last.ValueRef[i] = 1;
+                }
+
+            int count = n.CountMistakes(input.ToArray(), result.ToArray(), (double[] L1, double[] L2) =>
+            {
+                int L1MaxIndex = 0;
+                for (int i = 1; i < L1.Length; i++)
+                    if (L1[L1MaxIndex] < L1[i])
+                        L1MaxIndex = i;
+                
+
+                return L2[L1MaxIndex] == 1;
+            });
+
+            MessageBox.Show((count / 50.0).ToString() + "% :אמינות הרשת המשוערת היא");
         }
 
         private void button2_Click(object sender, EventArgs e)
