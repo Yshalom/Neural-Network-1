@@ -216,7 +216,7 @@ namespace MyFirstNeuralNetwork
 
         private void button3_Click(object sender, EventArgs e)
         {
-            if (MessageBox.Show("?אתה בטוח שברצונך למחוק את הרשת, ליצור אחת חדשה", "הודעה", MessageBoxButtons.YesNo) != DialogResult.Yes)
+            if (MessageBox.Show("Are you sure you want to remove the previous ANN and make a new one?", "Warning alert", MessageBoxButtons.YesNo) != DialogResult.Yes)
                 return;
             n = new NeuralNetwork(900, new int[] { 20, 20 }, 10);
             n.Save("..//..//..//Neural Network.bin");
@@ -247,7 +247,7 @@ namespace MyFirstNeuralNetwork
                 return L2[L1MaxIndex] == 1;
             });
 
-            MessageBox.Show((count / 50.0).ToString() + "% :אמינות הרשת המשוערת היא");
+            MessageBox.Show("The ANN's accuracy is: " + (count / 50.0).ToString() + '%');
         }
 
         private void button2_Click(object sender, EventArgs e)
@@ -255,7 +255,7 @@ namespace MyFirstNeuralNetwork
             //MessageBox.Show("אי אפשר לעשות אימונים עכשיו", "הודעה", MessageBoxButtons.OK);
             //return;
 
-            if (MessageBox.Show("?אתה בטוח שברצונך לבצע אימון נוסף", "הודעה", MessageBoxButtons.YesNo) != DialogResult.Yes)
+            if (MessageBox.Show("Are you sure you want to train the ANN again? It may take a long time.", "Warning alert", MessageBoxButtons.YesNo) != DialogResult.Yes)
                 return;
 
             n.SetUpKernel();
@@ -339,7 +339,7 @@ namespace MyFirstNeuralNetwork
             int number = 0;
             for (int i = 0; i < 10; i++)
             {
-                text += i.ToString() + "). \x2192" + result[i].ToString() + "\r\n";
+                text += i.ToString() + "). \x2192" + result[i].ToString() + "\r\n"; // \x2192 is an arrow character.
                 if (result[i] > result[number])
                     number = i;
                 Color color = Color.FromArgb(255 - (int)(255 * result[i]), 255 - (int)(255 * result[i]), 255 - (int)(255 * result[i]));
@@ -381,8 +381,8 @@ namespace MyFirstNeuralNetwork
                 }
             }
             g4.DrawImage(bi, 0, 0);
-            g4.DrawString(":התוצאה היא", new Font("Guttman Yad-Brush", 50), new Pen(Color.Black).Brush, 110, 40);
-            g4.DrawString(number.ToString(), new Font("Calibri", 80), new Pen(Color.Black).Brush, 20, 15);
+            g4.DrawString("The result is:", new Font("Calibri", 50), new Pen(Color.Black).Brush, 70, 40);
+            g4.DrawString(number.ToString(), new Font("Calibri", 80), new Pen(Color.Black).Brush, 430, 15);
         }
 
         private void panel1_MouseUp(object sender, MouseEventArgs e)

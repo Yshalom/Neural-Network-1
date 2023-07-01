@@ -64,10 +64,9 @@ namespace MyFirstNeuralNetwork
             this.button1.Font = new System.Drawing.Font("Calibri", 20.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
             this.button1.Location = new System.Drawing.Point(218, 130);
             this.button1.Name = "button1";
-            this.button1.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
             this.button1.Size = new System.Drawing.Size(100, 100);
             this.button1.TabIndex = 2;
-            this.button1.Text = "לתוצאה";
+            this.button1.Text = "Result";
             this.button1.UseVisualStyleBackColor = false;
             this.button1.Click += new System.EventHandler(this.button1_Click);
             // 
@@ -91,10 +90,9 @@ namespace MyFirstNeuralNetwork
             this.button2.ForeColor = System.Drawing.Color.Black;
             this.button2.Location = new System.Drawing.Point(218, 245);
             this.button2.Name = "button2";
-            this.button2.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
             this.button2.Size = new System.Drawing.Size(100, 100);
             this.button2.TabIndex = 2;
-            this.button2.Text = "אימון נוסף";
+            this.button2.Text = "Train again";
             this.button2.UseVisualStyleBackColor = false;
             this.button2.Click += new System.EventHandler(this.button2_Click);
             // 
@@ -146,13 +144,12 @@ namespace MyFirstNeuralNetwork
             // button3
             // 
             this.button3.Cursor = System.Windows.Forms.Cursors.No;
-            this.button3.Font = new System.Drawing.Font("Calibri", 20.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+            this.button3.Font = new System.Drawing.Font("Calibri", 18F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
             this.button3.Location = new System.Drawing.Point(12, 427);
             this.button3.Name = "button3";
-            this.button3.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
             this.button3.Size = new System.Drawing.Size(200, 46);
             this.button3.TabIndex = 13;
-            this.button3.Text = "רשת חדשה";
+            this.button3.Text = "Make a mew ANN";
             this.button3.UseVisualStyleBackColor = true;
             this.button3.Click += new System.EventHandler(this.button3_Click);
             // 
@@ -161,10 +158,9 @@ namespace MyFirstNeuralNetwork
             this.button4.Font = new System.Drawing.Font("Calibri", 20.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
             this.button4.Location = new System.Drawing.Point(12, 479);
             this.button4.Name = "button4";
-            this.button4.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
             this.button4.Size = new System.Drawing.Size(200, 46);
             this.button4.TabIndex = 13;
-            this.button4.Text = "בדיקת אמינות";
+            this.button4.Text = "Find accurasy";
             this.button4.UseVisualStyleBackColor = true;
             this.button4.Click += new System.EventHandler(this.button4_Click);
             // 
