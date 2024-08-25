@@ -218,9 +218,9 @@ namespace MyFirstNeuralNetwork
         {
             if (MessageBox.Show("Are you sure you want to remove the previous ANN and make a new one?", "Warning alert", MessageBoxButtons.YesNo) != DialogResult.Yes)
                 return;
+            n.DeleteKernel();
             n = new NeuralNetwork(900, new int[] { 20, 20 }, 10);
             n.Save("..//..//..//Neural Network.bin");
-            n.SetUpKernel();
         }
 
         private void button4_Click(object sender, EventArgs e)
@@ -242,7 +242,7 @@ namespace MyFirstNeuralNetwork
                 for (int i = 1; i < L1.Length; i++)
                     if (L1[L1MaxIndex] < L1[i])
                         L1MaxIndex = i;
-                
+
 
                 return L2[L1MaxIndex] == 1;
             });
@@ -252,9 +252,6 @@ namespace MyFirstNeuralNetwork
 
         private void button2_Click(object sender, EventArgs e)
         {
-            //MessageBox.Show("אי אפשר לעשות אימונים עכשיו", "הודעה", MessageBoxButtons.OK);
-            //return;
-
             if (MessageBox.Show("Are you sure you want to train the ANN again? It may take a long time.", "Warning alert", MessageBoxButtons.YesNo) != DialogResult.Yes)
                 return;
 
@@ -262,16 +259,15 @@ namespace MyFirstNeuralNetwork
 
             Train(50, 250, 500);
             //MessageBox.Show("End - 50,250,500");
-            Train(50, 500, 500);
-            //MessageBox.Show("End - 50,500,500");
-            Train(50, 1000, 500);
-            //MessageBox.Show("End - 50,1000,500");
-            Train(50, 2500, 500);
-            //MessageBox.Show("End - 50,2500,500");
-            Train(50, 5000, 500);
-            //MessageBox.Show("End - 50,5000,500");
+            Train(20, 500, 500);
+            //MessageBox.Show("End - 20,500,500");
+            Train(20, 1000, 500);
+            //MessageBox.Show("End - 20,1000,500");
+            Train(20, 2500, 500);
+            //MessageBox.Show("End - 20,2500,500");
+            Train(20, 5000, 500);
+            //MessageBox.Show("End - 20,5000,500");
             MessageBox.Show("End Train");
-
 
             n.Save("..//..//..//Neural Network.bin");
         }
@@ -280,7 +276,6 @@ namespace MyFirstNeuralNetwork
         {
             int InOrder = DataSize * 10 / Parallel;
 
-            //Random random = new Random(DateTime.Now.Millisecond + DateTime.Now.Second * 1000 + DateTime.Now.Month * 60000 + DateTime.Now.Hour * 3600000);
             Random random = new Random();
 
             System.Threading.Tasks.Parallel.For(0, InOrder, iteration =>
@@ -294,7 +289,11 @@ namespace MyFirstNeuralNetwork
                 {
                     List<string> input = new List<string>();
                     List<double[]> result = new List<double[]>();
-                    lock (l) { lock (input) { lock (result)
+                    lock (l)
+                    {
+                        lock (input)
+                        {
+                            lock (result)
                             {
                                 for (int j = 0; j < Parallel; j++)
                                 {
@@ -307,9 +306,10 @@ namespace MyFirstNeuralNetwork
 
                                     l[n] = l[^1];
                                     l.RemoveAt(l.Count - 1);
-
                                 }
-                            } } }
+                            }
+                        }
+                    }
 
                     //if (random.Next(0, 100) == 0)
                     //{
@@ -397,6 +397,11 @@ namespace MyFirstNeuralNetwork
 
             Bitmap map = new Bitmap(img, SizeOfImage, SizeOfImage);
             pictureBox3.Image = new Bitmap(map, 200, 200);
+        }
+
+        private void Form1_FormClosed(object sender, FormClosedEventArgs e)
+        {
+            n.DeleteKernel();
         }
     }
 }

@@ -15,11 +15,15 @@ namespace MyFirstNeuralNetwork
     {
         private double Effective(double x)
         {
-            return 1 / (1 + Math.Pow(Math.E, -x));
+            //return 1 / (1 + Math.Pow(Math.E, -x));
+            //return x / ((x < 0 ? -x : x) + 1) / 2 + 0.5;
+            return (x < -5 ? 0 : (x > 5 ? 1 : x / 10 + 0.5));
         }
         private double Derivative(double x)
         {
-            return Effective(x) * (1 - Effective(x));
+            //return Effective(x) * (1 - Effective(x));
+            //return 1 / (4 * (x < 0 ? -x : x) + 2 * x * x + 2);
+            return (x < -5 || x > 5 ? 0 : 0.1);
         }
 
         private int InputSize;
@@ -47,14 +51,14 @@ namespace MyFirstNeuralNetwork
             {
                 List<double> layer = new List<double>();
                 for (int j = 0; j < HidenSize[i]; j++)
-                    layer.Add(rand.NextDouble() * 4 - 2);
+                    layer.Add(rand.NextDouble() - 0.5);
                 _HidenBase.Add(layer.ToArray());
             }
             HidenBase = _HidenBase.ToArray();
             //output
             List<double> _OutputBase = new List<double>();
             for (int i = 0; i < OutputSize; i++)
-                _OutputBase.Add(rand.NextDouble() * 4 - 2);
+                _OutputBase.Add(rand.NextDouble() - 0.5);
             OutputBase = _OutputBase.ToArray();
 
             //Create Weight
@@ -65,7 +69,7 @@ namespace MyFirstNeuralNetwork
             {
                 List<double> LayerWeight = new List<double>();
                 for (int j = 0; j < InputSize; j++)
-                    LayerWeight.Add(rand.NextDouble() * 2 - 1);
+                    LayerWeight.Add(rand.NextDouble() - 0.5);
                 Layer.Add(LayerWeight.ToArray());
             }
             _HidenWeight.Add(Layer.ToArray());
@@ -76,7 +80,7 @@ namespace MyFirstNeuralNetwork
                 {
                     List<double> LayerWeight = new List<double>();
                     for (int k = 0; k < HidenSize[i - 1]; k++)
-                        LayerWeight.Add(rand.NextDouble() * 2 - 1);
+                        LayerWeight.Add(rand.NextDouble() - 0.5);
                     Layer.Add(LayerWeight.ToArray());
                 }
                 _HidenWeight.Add(Layer.ToArray());
@@ -88,7 +92,7 @@ namespace MyFirstNeuralNetwork
             {
                 List<double> LayerWeight = new List<double>();
                 for (int j = 0; j < HidenSize[HidenSize.Length - 1]; j++)
-                    LayerWeight.Add(rand.NextDouble() * 2 - 1);
+                    LayerWeight.Add(rand.NextDouble() - 0.5);
                 _OutputWeight.Add(LayerWeight.ToArray());
             }
             OutputWeight = _OutputWeight.ToArray();
@@ -165,16 +169,25 @@ namespace MyFirstNeuralNetwork
         ~NeuralNetwork()
         {
             //Release Kernel its objects
-            CL.ReleaseKernel(kernel);
-            CL.ReleaseProgram(program);
-            CL.ReleaseCommandQueue(queue);
-            CL.ReleaseContext(context);
-            CL.ReleaseDevice(devices[0]);
+            DeleteKernel();
+        }
 
-            CL.ReleaseMemoryObject(BInputSize);
-            CL.ReleaseMemoryObject(BHidenSize);
-            CL.ReleaseMemoryObject(BOutputSize);
-            CL.ReleaseMemoryObject(BHidenSizeLength);
+        public void DeleteKernel()
+        {
+            if (IsKernelRight)
+            {
+                CL.ReleaseKernel(kernel);
+                CL.ReleaseProgram(program);
+                CL.ReleaseCommandQueue(queue);
+                CL.ReleaseContext(context);
+                CL.ReleaseDevice(devices[0]);
+
+                CL.ReleaseMemoryObject(BInputSize);
+                CL.ReleaseMemoryObject(BHidenSize);
+                CL.ReleaseMemoryObject(BOutputSize);
+                CL.ReleaseMemoryObject(BHidenSizeLength);
+                IsKernelRight = false;
+            }
         }
 
         public void Save(string Path)
@@ -930,7 +943,7 @@ namespace MyFirstNeuralNetwork
 
             Gradient[] Gradients = new Gradient[Div];
 
-           // try
+            // try
             {
                 if (Div > 1)
                 {
@@ -959,23 +972,23 @@ namespace MyFirstNeuralNetwork
 
             //avarage the gradient
             for (int i = 1; i < Gradients.Length; i++)
-                {
-                    for (int j = 0; j < g.GHidenBase.Length; j++)
-                        for (int k = 0; k < g.GHidenBase[j].Length; k++)
-                            g.GHidenBase[j][k] += Gradients[i].GHidenBase[j][k];
+            {
+                for (int j = 0; j < g.GHidenBase.Length; j++)
+                    for (int k = 0; k < g.GHidenBase[j].Length; k++)
+                        g.GHidenBase[j][k] += Gradients[i].GHidenBase[j][k];
 
-                    for (int j = 0; j < g.GHidenWeight.Length; j++)
-                        for (int k = 0; k < g.GHidenWeight[j].Length; k++)
-                            for (int l = 0; l < g.GHidenWeight[j][k].Length; l++)
-                                g.GHidenWeight[j][k][l] = Gradients[i].GHidenWeight[j][k][l];
+                for (int j = 0; j < g.GHidenWeight.Length; j++)
+                    for (int k = 0; k < g.GHidenWeight[j].Length; k++)
+                        for (int l = 0; l < g.GHidenWeight[j][k].Length; l++)
+                            g.GHidenWeight[j][k][l] = Gradients[i].GHidenWeight[j][k][l];
 
-                    for (int j = 0; j < g.GOutputBase.Length; j++)
-                        g.GOutputBase[j] = Gradients[i].GOutputBase[j];
+                for (int j = 0; j < g.GOutputBase.Length; j++)
+                    g.GOutputBase[j] = Gradients[i].GOutputBase[j];
 
-                    for (int j = 0; j < g.GOutputWeight.Length; j++)
-                        for (int k = 0; k < g.GOutputWeight[j].Length; k++)
-                            g.GOutputWeight[j][k] += Gradients[i].GOutputWeight[j][k];
-                }
+                for (int j = 0; j < g.GOutputWeight.Length; j++)
+                    for (int k = 0; k < g.GOutputWeight[j].Length; k++)
+                        g.GOutputWeight[j][k] += Gradients[i].GOutputWeight[j][k];
+            }
 
             lock (HidenBase)
             {

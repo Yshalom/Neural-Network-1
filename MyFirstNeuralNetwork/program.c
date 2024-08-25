@@ -1,10 +1,14 @@
 ﻿double Effective(double x)
 {
-    return 1 / (1 + pow(2.71828182845904, -x));
+    //return 1 / (1 + pow(2.71828182845904, -x));
+	//return x / ((x < 0 ? -x : x) + 1) / 2 + 0.5;
+	return (x < -5 ? 0 : (x > 5 ? 1 : x / 10 + 0.5));
 }
 double Derivative(double x)
 {
-    return Effective(x) * (1 - Effective(x));
+    //return Effective(x) * (1 - Effective(x));
+	//return 1 / (4 * (x < 0 ? -x : x) + 2 * x * x + 2);
+	return (x < -5 || x > 5 ? 0 : 0.1);
 }
 
 
